@@ -36,6 +36,21 @@ public class SecurityConfigurer extends ResourceServerConfigurerAdapter {
   @Autowired
   private SecurityProperties securityProperties;
 
+  @Bean
+  public CorsConfigurationSource corsConfigurationSource() {
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", securityProperties.getCorsConfiguration());
+    return source;
+  }
+
+  @Autowired
+  private CorsConfigurationSource corsConfigurationSource;
+
+  @Bean
+  public JwtAccessTokenCustomizer jwtAccessTokenCustomizer(ObjectMapper mapper) {
+    return new JwtAccessTokenCustomizer(mapper);
+  }
+
   @Override
   public void configure(ResourceServerSecurityConfigurer resources) throws Exception {
     resources.resourceId(resourceServerProperties.getResourceId());
@@ -46,7 +61,7 @@ public class SecurityConfigurer extends ResourceServerConfigurerAdapter {
     // @formatter:off
     http
       .csrf().disable()
-      .cors().configurationSource(corsConfigurationSource())
+      .cors().configurationSource(corsConfigurationSource)
       .and()
       .headers().frameOptions().disable()
       .and()
@@ -54,18 +69,6 @@ public class SecurityConfigurer extends ResourceServerConfigurerAdapter {
         .antMatchers(securityProperties.getApiMatcher())
         .authenticated();
     // @formatter:on
-  }
-
-  @Bean
-  public CorsConfigurationSource corsConfigurationSource() {
-    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-    source.registerCorsConfiguration("/**", securityProperties.getCorsConfiguration());
-    return source;
-  }
-
-  @Bean
-  public JwtAccessTokenCustomizer jwtAccessTokenCustomizer(ObjectMapper mapper) {
-    return new JwtAccessTokenCustomizer(mapper);
   }
 
   @Configuration
