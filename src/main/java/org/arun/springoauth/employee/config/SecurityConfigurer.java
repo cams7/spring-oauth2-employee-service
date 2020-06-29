@@ -59,9 +59,7 @@ public class SecurityConfigurer extends ResourceServerConfigurerAdapter {
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-    if (null != securityProperties.getCorsConfiguration()) {
-      source.registerCorsConfiguration("/**", securityProperties.getCorsConfiguration());
-    }
+    source.registerCorsConfiguration("/**", securityProperties.getCorsConfiguration());
     return source;
   }
 
