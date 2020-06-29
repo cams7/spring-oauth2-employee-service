@@ -1,6 +1,5 @@
 package org.arun.springoauth.employee.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +18,7 @@ import org.springframework.security.oauth2.config.annotation.web.configuration.R
 import org.springframework.security.oauth2.config.annotation.web.configurers.ResourceServerSecurityConfigurer;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Configuration
 @EnableWebSecurity
@@ -43,19 +43,17 @@ public class SecurityConfigurer extends ResourceServerConfigurerAdapter {
 
   @Override
   public void configure(final HttpSecurity http) throws Exception {
-
-    http.cors()
-        .configurationSource(corsConfigurationSource())
-        .and()
-        .headers()
-        .frameOptions()
-        .disable()
-        .and()
-        .csrf()
-        .disable()
-        .authorizeRequests()
+    // @formatter:off
+    http
+      .csrf().disable()
+      .cors().configurationSource(corsConfigurationSource())
+      .and()
+      .headers().frameOptions().disable()
+      .and()
+      .authorizeRequests()
         .antMatchers(securityProperties.getApiMatcher())
         .authenticated();
+    // @formatter:on
   }
 
   @Bean
@@ -73,7 +71,8 @@ public class SecurityConfigurer extends ResourceServerConfigurerAdapter {
   }
 
   @Configuration
-  @ConditionalOnProperty(prefix = "security.oauth2.client", value = "grant-type", havingValue = "client_credentials")
+  @ConditionalOnProperty(prefix = "security.oauth2.client", value = "grant-type",
+      havingValue = "client_credentials")
   public static class OAuthRestTemplateConfigurer {
 
     @Bean

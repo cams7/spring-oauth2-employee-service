@@ -1,7 +1,5 @@
 package org.arun.springoauth.employee.config;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -18,14 +16,17 @@ import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.springframework.security.oauth2.provider.OAuth2Request;
 import org.springframework.security.oauth2.provider.token.DefaultAccessTokenConverter;
 import org.springframework.security.oauth2.provider.token.store.JwtAccessTokenConverter;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
-public class JwtAccessTokenCustomizer extends DefaultAccessTokenConverter implements JwtAccessTokenConverterConfigurer {
+public class JwtAccessTokenCustomizer extends DefaultAccessTokenConverter implements
+    JwtAccessTokenConverterConfigurer {
 
   private static final Logger LOG = LoggerFactory.getLogger(JwtAccessTokenCustomizer.class);
 
-  private static final String CLIENT_NAME_ELEMENT_IN_JWT = "resource_access";
+  private static final String CLIENT_NAME_ELEMENT_IN_JWT = "aud";
 
-  private static final String ROLE_ELEMENT_IN_JWT = "roles";
+  private static final String ROLE_ELEMENT_IN_JWT = "authorities";
 
   private ObjectMapper mapper;
 
@@ -42,14 +43,13 @@ public class JwtAccessTokenCustomizer extends DefaultAccessTokenConverter implem
   }
 
   /**
-   * Spring oauth2 expects roles under authorities element in tokenMap, but keycloak provides it under resource_access. Hence extractAuthentication
-   * method is overriden to extract roles from resource_access.
+   * Spring oauth2 expects roles under authorities element in tokenMap, but keycloak provides it under
+   * resource_access. Hence extractAuthentication method is overriden to extract roles from resource_access.
    *
    * @return OAuth2Authentication with authorities for given application
    */
   @Override
   public OAuth2Authentication extractAuthentication(Map<String, ?> tokenMap) {
-    LOG.debug("Begin extractAuthentication: tokenMap = {}", tokenMap);
     JsonNode token = mapper.convertValue(tokenMap, JsonNode.class);
     Set<String> audienceList = extractClients(token); // extracting client names
     List<GrantedAuthority> authorities = extractRoles(token); // extracting client roles
@@ -57,45 +57,35 @@ public class JwtAccessTokenCustomizer extends DefaultAccessTokenConverter implem
     OAuth2Authentication authentication = super.extractAuthentication(tokenMap);
     OAuth2Request oAuth2Request = authentication.getOAuth2Request();
 
-    OAuth2Request request =
-        new OAuth2Request(oAuth2Request.getRequestParameters(), oAuth2Request.getClientId(), authorities, true, oAuth2Request.getScope(),
-            audienceList, null, null, null);
+    OAuth2Request request = new OAuth2Request(oAuth2Request.getRequestParameters(), oAuth2Request.getClientId(),
+        authorities, true, oAuth2Request.getScope(), audienceList, null, null, null);
 
-    Authentication usernamePasswordAuthentication = new UsernamePasswordAuthenticationToken(authentication.getPrincipal(), "N/A", authorities);
-    LOG.debug("End extractAuthentication");
+    Authentication usernamePasswordAuthentication = new UsernamePasswordAuthenticationToken(authentication
+        .getPrincipal(), "N/A", authorities);
     return new OAuth2Authentication(request, usernamePasswordAuthentication);
   }
 
-  private List<GrantedAuthority> extractRoles(JsonNode jwt) {
-    LOG.debug("Begin extractRoles: jwt = {}", jwt);
+  private static List<GrantedAuthority> extractRoles(JsonNode jwt) {
+    if (!jwt.has(ROLE_ELEMENT_IN_JWT))
+      throw new IllegalArgumentException(String.format("Expected element %s not found in token",
+          ROLE_ELEMENT_IN_JWT));
+
     Set<String> rolesWithPrefix = new HashSet<>();
+    jwt.path(ROLE_ELEMENT_IN_JWT).elements().forEachRemaining(autority -> rolesWithPrefix.add(autority.asText()));
 
-    jwt.path(CLIENT_NAME_ELEMENT_IN_JWT)
-        .elements()
-        .forEachRemaining(e -> e.path(ROLE_ELEMENT_IN_JWT)
-            .elements()
-            .forEachRemaining(r -> rolesWithPrefix.add("ROLE_" + r.asText())));
-
-    final List<GrantedAuthority> authorityList = AuthorityUtils.createAuthorityList(rolesWithPrefix.toArray(new String[0]));
-    LOG.debug("End extractRoles: roles = {}", authorityList);
+    final List<GrantedAuthority> authorityList = AuthorityUtils.createAuthorityList(rolesWithPrefix.toArray(
+        new String[0]));
     return authorityList;
   }
 
-  private Set<String> extractClients(JsonNode jwt) {
-    LOG.debug("Begin extractClients: jwt = {}", jwt);
-    if (jwt.has(CLIENT_NAME_ELEMENT_IN_JWT)) {
-      JsonNode resourceAccessJsonNode = jwt.path(CLIENT_NAME_ELEMENT_IN_JWT);
-      final Set<String> clientNames = new HashSet<>();
-      resourceAccessJsonNode.fieldNames()
-          .forEachRemaining(clientNames::add);
+  private static Set<String> extractClients(JsonNode jwt) {
+    if (!jwt.has(CLIENT_NAME_ELEMENT_IN_JWT))
+      throw new IllegalArgumentException(String.format("Expected element %s not found in token",
+          CLIENT_NAME_ELEMENT_IN_JWT));
 
-      LOG.debug("End extractClients: clients = {}", clientNames);
-      return clientNames;
-
-    } else {
-      throw new IllegalArgumentException("Expected element " + CLIENT_NAME_ELEMENT_IN_JWT + " not found in token");
-    }
-
+    final Set<String> clientNames = new HashSet<>();
+    jwt.path(CLIENT_NAME_ELEMENT_IN_JWT).forEach(node -> clientNames.add(node.asText()));
+    return clientNames;
   }
 
 }
